@@ -41,7 +41,11 @@ apiRouter.get('/health', (req: Request, res: Response) => {
  * Generates an episodic 60s+ multi-scene cinematic screenplay & shot breakdown
  */
 apiRouter.post('/gemini/storyboard', async (req: Request, res: Response) => {
-  const { prompt, style = '35mm Anamorphic Film', targetDuration = 60, sceneCount = 6 } = req.body;
+  const { prompt, style = '35mm Anamorphic Film' } = req.body;
+  const targetDuration = Math.max(5, Math.min(600, Number(req.body.targetDuration) || 60));
+  const sceneCount = req.body.sceneCount 
+    ? Math.max(1, Math.min(15, Number(req.body.sceneCount)))
+    : targetDuration <= 12 ? 1 : targetDuration <= 25 ? 2 : targetDuration <= 40 ? 3 : targetDuration <= 75 ? 6 : Math.min(12, Math.round(targetDuration / 10));
 
   if (!prompt) {
     return res.status(400).json({ error: 'Prompt is required' });

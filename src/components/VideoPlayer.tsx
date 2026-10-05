@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Play,
   Pause,
+  Square,
   RotateCcw,
   Volume2,
   VolumeX,
@@ -170,6 +171,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
+  const handleStop = () => {
+    onPlayPauseToggle(false);
+    audioSynthesizer.stopSoundtrack();
+    audioSynthesizer.stopVoiceover();
+  };
+
   const formatTimecode = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
@@ -200,12 +207,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       className="flex flex-col items-center justify-center bg-neutral-950/80 border border-neutral-800/90 rounded-2xl p-3 sm:p-4 backdrop-blur-md relative select-none"
     >
       {/* Aspect Ratio Framing Box */}
-      <div className={`relative mx-auto rounded-xl overflow-hidden bg-black shadow-2xl border border-neutral-800/80 flex items-center justify-center ${getAspectRatioClasses()}`}>
+      <div className={`relative mx-auto rounded-xl overflow-hidden bg-black shadow-2xl border border-neutral-800/80 flex items-center justify-center group ${getAspectRatioClasses()}`}>
         <canvas
           ref={canvasRef}
           width={1920}
           height={1080}
-          onClick={() => onPlayPauseToggle(!isPlaying)}
+          onClick={() => {
+            if (isPlaying) {
+              handleStop();
+            } else {
+              onPlayPauseToggle(true);
+            }
+          }}
           className="w-full h-full object-contain cursor-pointer"
         />
 
@@ -223,14 +236,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </div>
         )}
 
+        {/* Floating Quick Stop Badge on Hover while playing */}
+        {isPlaying && (
+          <button
+            type="button"
+            onClick={handleStop}
+            className="absolute top-3 right-3 bg-red-600/90 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 shadow-lg transition opacity-80 group-hover:opacity-100"
+            title="Stop Preview (Click anywhere on video)"
+          >
+            <Square className="w-3 h-3 fill-current" />
+            <span>STOP PREVIEW</span>
+          </button>
+        )}
+
         {/* Transitioning Indicator */}
-        {activeInfo && activeInfo.transitionProgress !== null && (
+        {activeInfo && activeInfo.transitionProgress !== null && !isPlaying && (
           <div className="absolute top-3 right-3 bg-red-500/20 border border-red-500/40 text-red-300 px-2 py-0.5 rounded text-[10px] font-mono tracking-wider backdrop-blur-md animate-pulse">
             TRANSITION: {activeInfo.currentClip.transition.toUpperCase()}
           </div>
         )}
 
-        {/* Big Center Play Button Overlay on Pause */}
+        {/* Big Center Play Button Overlay on Pause/Stop */}
         {!isPlaying && (
           <button
             onClick={() => onPlayPauseToggle(true)}
@@ -272,9 +298,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {/* Video Control Bar */}
       <div className="w-full max-w-[850px] mt-2 flex items-center justify-between gap-3 text-neutral-300">
-        {/* Left: Play/Pause, Rewind, Timecode */}
+        {/* Left: Play/Pause, Stop, Rewind, Timecode */}
         <div className="flex items-center gap-2">
+          {/* Play / Pause */}
           <button
+            type="button"
             onClick={() => onPlayPauseToggle(!isPlaying)}
             className="w-8 h-8 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 flex items-center justify-center text-amber-400 hover:text-white transition active:scale-95"
             title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
@@ -282,10 +310,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
           </button>
 
+          {/* Dedicated Stop Button */}
           <button
-            onClick={() => onTimeUpdate(0)}
+            type="button"
+            onClick={handleStop}
+            className={`px-2.5 h-8 rounded-lg border flex items-center gap-1.5 text-xs font-semibold transition active:scale-95 ${
+              isPlaying
+                ? 'bg-red-500/20 border-red-500/50 text-red-300 hover:bg-red-500/30'
+                : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+            }`}
+            title="Stop preview immediately at current frame"
+          >
+            <Square className="w-3 h-3 fill-current" />
+            <span>Stop</span>
+          </button>
+
+          {/* Rewind */}
+          <button
+            type="button"
+            onClick={() => {
+              handleStop();
+              onTimeUpdate(0);
+            }}
             className="w-8 h-8 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 flex items-center justify-center text-neutral-400 hover:text-neutral-200 transition"
-            title="Rewind to start"
+            title="Rewind to 00:00"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>

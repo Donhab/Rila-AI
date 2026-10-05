@@ -15,6 +15,7 @@ export interface GeneratedScene {
 export interface GeneratedFilm {
   title: string;
   synopsis: string;
+  targetDuration: number;
   scenes: GeneratedScene[];
 }
 
@@ -64,10 +65,27 @@ const THEMED_IMAGES = {
 
 export function generateEpisodicStoryboard(
   userPrompt: string,
-  style: CinematicStyle
+  style: CinematicStyle,
+  targetDuration: number = 60
 ): GeneratedFilm {
   const p = userPrompt.trim();
   const lower = p.toLowerCase();
+  const duration = Math.max(5, Math.min(600, targetDuration));
+
+  // Determine number of scenes (each scene between 7s and 12s, minimum 1 scene)
+  let sceneCount = 6;
+  if (duration <= 12) sceneCount = 1;
+  else if (duration <= 25) sceneCount = 2;
+  else if (duration <= 40) sceneCount = 3;
+  else if (duration <= 55) sceneCount = 4;
+  else if (duration <= 75) sceneCount = 6;
+  else if (duration <= 100) sceneCount = 8;
+  else if (duration <= 140) sceneCount = 10;
+  else sceneCount = Math.min(12, Math.round(duration / 12));
+
+  // Calculate duration per scene so sum equals targetDuration
+  const baseDuration = Math.floor(duration / sceneCount);
+  const remainder = duration % sceneCount;
 
   // Detect theme
   let theme: 'scifi' | 'cyberpunk' | 'darkfantasy' | 'nature' | 'action' = 'cyberpunk';
@@ -87,7 +105,7 @@ export function generateEpisodicStoryboard(
   const words = p.split(' ').filter(w => w.length > 2);
   const coreSubject = words.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'The Odyssey';
   const filmTitle = `${coreSubject}: Act of Destiny`;
-  const synopsis = `A breathtaking cinematic odyssey exploring ${p.toLowerCase()}, told across six continuous episodic chapters.`;
+  const synopsis = `A breathtaking cinematic odyssey (${duration}s) exploring ${p.toLowerCase()}, told across ${sceneCount} continuous episodic scenes.`;
 
   const cameraMoves: CameraMovement[] = [
     'drone-crane',
@@ -95,7 +113,13 @@ export function generateEpisodicStoryboard(
     'dolly-in',
     'pan-right',
     'orbit-cw',
+    'tilt-up',
     'dolly-out',
+    'pan-left',
+    'tracking-forward',
+    'dolly-in',
+    'drone-crane',
+    'static-tripod',
   ];
 
   const shotTypes = [
@@ -104,63 +128,49 @@ export function generateEpisodicStoryboard(
     'Macro Emotional Close-Up',
     'Sweeping Pan Vista',
     'Epic Dynamic Orbiting Shot',
+    'Dramatic Crane Tilt-Up',
     'Majestic Pullback Finale',
+    'Telephoto Tracking Profile',
+    'Medium Steadicam Drift',
+    'High Altitude Reveal',
+    'Wide Horizon Atmosphere',
+    'Composed Tripod Master Shot',
   ];
 
-  const acts = [
-    {
-      act: 'Act I: The Inciting Vision',
-      sub: 'Prologue — First Glimpse',
-      voice: `It began where the known world ends: with ${p.toLowerCase()}.`,
-      sfx: 'Sub-bass atmospheric drone with rising ethereal wind',
-    },
-    {
-      act: 'Act II: The Journey Inward',
-      sub: 'Sector Boundary — Crossing',
-      voice: 'Every step deeper into the uncharted revealed echoes of what was forgotten.',
-      sfx: 'Echoing metallic transients and subtle rhythmic pulse',
-    },
-    {
-      act: 'Act III: The Awakening',
-      sub: 'Deep Observation — Focus',
-      voice: 'Then, without warning, the ancient patterns aligned before our eyes.',
-      sfx: 'High frequency crystalline shimmer with optical shutter snap',
-    },
-    {
-      act: 'Act IV: The Turning Point',
-      sub: 'Threshold — Escalation',
-      voice: 'There was no turning back; the threshold between illusion and reality collapsed.',
-      sfx: 'Tension riser with sub-harmonic wave impact',
-    },
-    {
-      act: 'Act V: The Climax',
-      sub: 'Peak Convergence — Climax',
-      voice: 'A blinding surge of pure kinetic energy reshaped everything in its path.',
-      sfx: 'Cinematic orchestral swell with thunderous bass drop',
-    },
-    {
-      act: 'Act VI: The New Horizon',
-      sub: 'Epilogue — Dawn of New World',
-      voice: 'When the dust finally settled, the world stood forever transformed.',
-      sfx: 'Peaceful celestial pads fading into distant silence',
-    },
+  const narrativeCues = [
+    { act: 'Act I: The Inciting Vision', sub: 'Prologue — First Glimpse', voice: `It began where the known world ends: with ${p.toLowerCase()}.`, sfx: 'Sub-bass atmospheric drone with rising wind' },
+    { act: 'Act II: The Crossing', sub: 'Boundary — Crossing', voice: 'Every step deeper into the uncharted revealed echoes of what was forgotten.', sfx: 'Echoing metallic transients and subtle rhythmic pulse' },
+    { act: 'Act III: The Awakening', sub: 'Deep Observation — Focus', voice: 'Then, without warning, the ancient patterns aligned before our eyes.', sfx: 'High frequency crystalline shimmer with optical shutter snap' },
+    { act: 'Act IV: The Turning Point', sub: 'Threshold — Escalation', voice: 'There was no turning back; the threshold between illusion and reality collapsed.', sfx: 'Tension riser with sub-harmonic wave impact' },
+    { act: 'Act V: The Climax', sub: 'Peak Convergence — Climax', voice: 'A blinding surge of pure kinetic energy reshaped everything in its path.', sfx: 'Cinematic orchestral swell with thunderous bass drop' },
+    { act: 'Act VI: The Resolution', sub: 'Epilogue — Dawn of New World', voice: 'When the dust finally settled, the world stood forever transformed.', sfx: 'Peaceful celestial pads fading into distant silence' },
+    { act: 'Act VII: The Legacy', sub: 'Memory Archive — Truth', voice: 'The signal echoed across light years, answering a question asked long ago.', sfx: 'Distant radio telemetry with harmonic strings' },
+    { act: 'Act VIII: The Far Frontier', sub: 'The Endless Horizon', voice: 'Ahead lay the open horizon, boundless and infinite.', sfx: 'Ethereal ambient drone with warm bass warmth' },
+    { act: 'Act IX: The Final Departure', sub: 'Beyond the Stars', voice: 'And so we sailed forward, beyond the reach of gravity and fear.', sfx: 'Orchestral brass crescendo and wind rush' },
+    { act: 'Act X: The Eternal Beacon', sub: 'Cosmic Constellation', voice: 'A single spark that would guide travelers for thousand generations.', sfx: 'Subtle high bell chimes in deep silence' },
   ];
 
-  const scenes: GeneratedScene[] = acts.map((actData, idx) => ({
-    title: actData.act,
-    shotType: shotTypes[idx],
-    prompt: `${p}, ${actData.act}, cinematic lighting, photorealistic 8k, master cinematography`,
-    cameraMovement: cameraMoves[idx],
-    duration: 10,
-    voiceoverText: actData.voice,
-    soundEffect: actData.sfx,
-    subtitleText: actData.sub,
-    imageUrl: images[idx % images.length],
-  }));
+  const scenes: GeneratedScene[] = [];
+  for (let i = 0; i < sceneCount; i++) {
+    const cue = narrativeCues[i % narrativeCues.length];
+    const sceneDuration = baseDuration + (i < remainder ? 1 : 0);
+    scenes.push({
+      title: sceneCount === 1 ? 'Cinematic Scene' : `Scene ${i + 1}: ${cue.act.split(':')[1]?.trim() || cue.act}`,
+      shotType: shotTypes[i % shotTypes.length],
+      prompt: `${p}, Scene ${i + 1}, cinematic lighting, photorealistic 8k, master cinematography`,
+      cameraMovement: cameraMoves[i % cameraMoves.length],
+      duration: sceneDuration,
+      voiceoverText: cue.voice,
+      soundEffect: cue.sfx,
+      subtitleText: cue.sub,
+      imageUrl: images[i % images.length],
+    });
+  }
 
   return {
     title: filmTitle,
     synopsis,
+    targetDuration: duration,
     scenes,
   };
 }

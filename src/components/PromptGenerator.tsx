@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Video, Wand2, Film, Clapperboard, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { Sparkles, Video, Wand2, Film, Clapperboard, CheckCircle2, Loader2, ArrowRight, Clock } from 'lucide-react';
 import { CameraMovement, CinematicStyle, VideoClip } from '../types/video';
 import { CAMERA_MOVEMENTS, CINEMATIC_STYLES } from '../data/cinematicPresets';
 import { generateEpisodicStoryboard } from '../utils/storyboardGenerator';
@@ -28,11 +28,16 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
 }) => {
   const [prompt, setPrompt] = useState('');
   const [generationMode, setGenerationMode] = useState<'film-60s' | 'single-clip'>('film-60s');
+  const [targetDuration, setTargetDuration] = useState<number>(60);
+  const [durationPreset, setDurationPreset] = useState<'15' | '30' | '60' | '90' | '120' | 'custom'>('60');
   const [selectedCamera, setSelectedCamera] = useState<CameraMovement>('dolly-in');
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>('');
   const [generationStep, setGenerationStep] = useState<number>(0);
+
+  const sceneEstimate = targetDuration <= 12 ? 1 : targetDuration <= 25 ? 2 : targetDuration <= 40 ? 3 : targetDuration <= 55 ? 4 : targetDuration <= 75 ? 6 : targetDuration <= 100 ? 8 : Math.min(12, Math.round(targetDuration / 10));
+  const sceneDurationEstimate = (targetDuration / sceneEstimate).toFixed(1);
 
   const handleEnhancePrompt = async () => {
     if (!prompt.trim()) return;
@@ -76,8 +81,8 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
       const activeStyle = CINEMATIC_STYLES.find((s) => s.id === selectedStyle) || CINEMATIC_STYLES[0];
 
       if (generationMode === 'film-60s') {
-        // Multi-scene 60s+ episodic video generation
-        setGenerationStatus('Rila AI Director crafting 6-scene episodic narrative arc (60s+)...');
+        // Multi-scene customizable duration episodic video generation
+        setGenerationStatus(`Rila AI Director crafting ${sceneEstimate}-scene narrative arc (${targetDuration}s)...`);
         setGenerationStep(1);
 
         let storyboard: {
@@ -103,8 +108,8 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
             body: JSON.stringify({
               prompt,
               style: activeStyle.label,
-              targetDuration: 60,
-              sceneCount: 6,
+              targetDuration: targetDuration,
+              sceneCount: sceneEstimate,
             }),
           });
 
@@ -120,8 +125,8 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
 
         // Seamless built-in Rila Director Engine fallback if backend returns unconfigured or fails
         if (!storyboard || !storyboard.scenes || storyboard.scenes.length === 0) {
-          setGenerationStatus('Rila AI Director designing episodic 6-scene cinematic arc...');
-          storyboard = generateEpisodicStoryboard(prompt, selectedStyle);
+          setGenerationStatus(`Rila AI Director designing ${targetDuration}s episodic cinematic arc...`);
+          storyboard = generateEpisodicStoryboard(prompt, selectedStyle, targetDuration);
         }
 
         const scenes = storyboard.scenes || [];
@@ -430,6 +435,85 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
         ))}
       </div>
 
+      {/* Video Duration Selector (Set Any Length) */}
+      {generationMode === 'film-60s' && (
+        <div className="mb-4 bg-neutral-950/70 border border-neutral-800/80 rounded-xl p-3 z-10 relative">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <label className="text-[11px] font-mono uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 font-bold">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Video Duration (Set to Any Length)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+                {targetDuration}s Total • {sceneEstimate} Scenes (~{sceneDurationEstimate}s each)
+              </span>
+            </div>
+          </div>
+
+          {/* Quick preset duration buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+            {[
+              { id: '15', label: '15s (Short)' },
+              { id: '30', label: '30s (Social)' },
+              { id: '60', label: '60s (Feature)' },
+              { id: '90', label: '90s (Director Cut)' },
+              { id: '120', label: '120s (2 Min)' },
+              { id: 'custom', label: 'Custom Length' },
+            ].map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => {
+                  setDurationPreset(preset.id as any);
+                  if (preset.id !== 'custom') {
+                    setTargetDuration(parseInt(preset.id));
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition border ${
+                  durationPreset === preset.id
+                    ? 'bg-amber-500 text-neutral-950 border-amber-500 font-bold shadow-sm'
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Slider and number input for arbitrary seconds */}
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={5}
+              max={180}
+              step={5}
+              value={targetDuration}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setTargetDuration(val);
+                setDurationPreset('custom');
+              }}
+              className="flex-1 accent-amber-500 cursor-pointer"
+            />
+            <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg px-2.5 py-1">
+              <input
+                type="number"
+                min={5}
+                max={600}
+                value={targetDuration}
+                onChange={(e) => {
+                  const val = Math.max(5, Math.min(600, parseInt(e.target.value) || 5));
+                  setTargetDuration(val);
+                  setDurationPreset('custom');
+                }}
+                className="w-12 bg-transparent text-xs font-mono font-bold text-center text-white focus:outline-none"
+              />
+              <span className="text-[10px] text-neutral-500 font-mono">sec</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cinematic Style Selector Bar */}
       <div className="mb-4">
         <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-2">
@@ -496,7 +580,7 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
           {generationMode === 'film-60s' ? (
             <span className="flex items-center gap-1.5 text-emerald-400">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Full 60s+ multi-scene narrative sequence with synced timeline</span>
+              <span>{targetDuration}s episodic sequence ({sceneEstimate} scenes) synced to timeline</span>
             </span>
           ) : (
             <span>Generates an individual 10s shot clip to add to sequence</span>
@@ -512,13 +596,13 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
           {isGenerating ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin text-neutral-950" />
-              <span>Directing Video...</span>
+              <span>Directing {targetDuration}s Video...</span>
             </>
           ) : (
             <>
               <Film className="w-4 h-4" />
               <span>
-                {generationMode === 'film-60s' ? 'Generate 60s+ Video with Rila AI' : 'Generate Shot with Rila AI'}
+                {generationMode === 'film-60s' ? `Generate ${targetDuration}s Video with Rila AI` : 'Generate Shot with Rila AI'}
               </span>
               <ArrowRight className="w-4 h-4" />
             </>

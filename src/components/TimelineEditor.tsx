@@ -125,6 +125,25 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
     onSelectClip(newClip.id);
   };
 
+  // Scale entire timeline to target total duration
+  const scaleToTargetDuration = (targetTotal: number) => {
+    if (!clips.length || targetTotal <= 0) return;
+    const currentTotal = clips.reduce((sum, c) => sum + c.duration, 0);
+    if (currentTotal <= 0) return;
+    const ratio = targetTotal / currentTotal;
+    let accumulated = 0;
+    const updated = clips.map((clip, idx) => {
+      if (idx === clips.length - 1) {
+        const remaining = Math.max(2, targetTotal - accumulated);
+        return { ...clip, duration: remaining };
+      }
+      const newDur = Math.max(2, Math.round(clip.duration * ratio));
+      accumulated += newDur;
+      return { ...clip, duration: newDur };
+    });
+    onClipsChange(updated);
+  };
+
   return (
     <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm">
       {/* Header: Clip Joiner Status & Actions */}
@@ -152,6 +171,26 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Quick Duration Scaler */}
+          <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg p-0.5 text-xs font-mono">
+            <span className="px-2 text-neutral-500 text-[10px] uppercase">Set Length:</span>
+            {[30, 60, 90, 120].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => scaleToTargetDuration(d)}
+                className={`px-2 py-1 rounded text-[11px] font-semibold transition ${
+                  Math.round(totalDuration) === d
+                    ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+                title={`Scale all clips so total duration is ${d}s`}
+              >
+                {d}s
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={handleAddNewClip}
             className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition"
