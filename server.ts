@@ -341,7 +341,10 @@ app.post('/api/video-download', async (req: Request, res: Response) => {
   }
 });
 
-// Vite middleware in dev or static dist in prod
+// Export Express app for Vercel Serverless Function
+export default app;
+
+// In local / container environment, start HTTP server
 async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
   const isProd = process.env.NODE_ENV === 'production';
@@ -364,4 +367,6 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
