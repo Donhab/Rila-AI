@@ -1,0 +1,7 @@
+{
+  "name": "CineGen Studio - AI Cinematic Video Generator & Clip Editor",
+  "description": "Create cinematic clips from text prompts, generate 60+ second multi-scene videos, customize cinematic styles, and edit & join clips with high-definition social media export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
