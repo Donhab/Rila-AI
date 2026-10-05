@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Film,
   Music,
@@ -15,9 +15,17 @@ import {
   Clock,
   ArrowRightLeft,
   Sliders,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  Wand2,
+  Check,
 } from 'lucide-react';
 import { TransitionType, VideoClip } from '../types/video';
-import { TRANSITION_OPTIONS, SOUNDTRACK_OPTIONS } from '../data/cinematicPresets';
+import {
+  TRANSITION_OPTIONS,
+  SOUNDTRACK_OPTIONS,
+  autoAssignAnimationsAndTransitions,
+} from '../data/cinematicPresets';
 
 interface TimelineEditorProps {
   clips: VideoClip[];
@@ -29,6 +37,7 @@ interface TimelineEditorProps {
   soundtrack: string;
   onSoundtrackChange: (track: string) => void;
   onOpenExport: () => void;
+  onOpenAddMedia?: (tab?: 'image' | 'video' | 'sound') => void;
 }
 
 export const TimelineEditor: React.FC<TimelineEditorProps> = ({
@@ -41,8 +50,25 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
   soundtrack,
   onSoundtrackChange,
   onOpenExport,
+  onOpenAddMedia,
 }) => {
+  const [autoAnimateToast, setAutoAnimateToast] = useState<string | null>(null);
+
   const totalDuration = clips.reduce((sum, c) => sum + (c.duration / (c.speed || 1)), 0);
+
+  // Automatically add beautiful animations and animated transitions to all video scenes
+  const handleAutoAssignTransitions = (mode: 'variety' | 'action' | 'ambient' = 'variety') => {
+    const updated = autoAssignAnimationsAndTransitions(clips, mode);
+    onClipsChange(updated);
+    const modeLabel =
+      mode === 'action'
+        ? 'Action Cuts (Whip Pan, Zoom Glitch, Blur)'
+        : mode === 'ambient'
+        ? 'Ambient Cinema (Film Burn, Light Leak, Dissolve)'
+        : 'Cinematic Variety (Film Burns, Light Leaks, Whip Pans, Glitches)';
+    setAutoAnimateToast(`Auto-assigned ${modeLabel} across all ${clips.length} scenes!`);
+    setTimeout(() => setAutoAnimateToast(null), 3500);
+  };
 
   // Reorder clip left / right
   const moveClip = (index: number, direction: 'left' | 'right') => {
@@ -145,7 +171,15 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
   };
 
   return (
-    <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm">
+    <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm relative">
+      {/* Auto-Animate Toast */}
+      {autoAnimateToast && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500 text-neutral-950 font-bold px-3 py-1.5 rounded-lg text-xs shadow-xl flex items-center gap-1.5 animate-in fade-in">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>{autoAnimateToast}</span>
+        </div>
+      )}
+
       {/* Header: Clip Joiner Status & Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-800/80 mb-4">
         <div className="flex items-center gap-3">
@@ -170,7 +204,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Quick Duration Scaler */}
           <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg p-0.5 text-xs font-mono">
             <span className="px-2 text-neutral-500 text-[10px] uppercase">Set Length:</span>
@@ -191,12 +225,81 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
             ))}
           </div>
 
+          {/* Auto-Animate & Animated Transitions Menu */}
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={() => handleAutoAssignTransitions('variety')}
+              className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm"
+              title="Automatically add animated transitions and camera movements"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+              <span>✨ Auto-Animate Transitions</span>
+            </button>
+            <div className="absolute right-0 top-full mt-1 hidden group-hover:flex flex-col bg-neutral-950 border border-neutral-800 rounded-xl p-1.5 shadow-2xl z-40 w-56 text-xs">
+              <button
+                type="button"
+                onClick={() => handleAutoAssignTransitions('variety')}
+                className="text-left px-2.5 py-1.5 hover:bg-neutral-900 rounded-lg text-neutral-200 hover:text-amber-400 transition"
+              >
+                ✨ Cinematic Variety (Film Burns, Leaks, Whip Pans)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAutoAssignTransitions('action')}
+                className="text-left px-2.5 py-1.5 hover:bg-neutral-900 rounded-lg text-neutral-200 hover:text-amber-400 transition"
+              >
+                ⚡ Action Cuts (Whip Pan, Zoom Glitch, Blur)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAutoAssignTransitions('ambient')}
+                className="text-left px-2.5 py-1.5 hover:bg-neutral-900 rounded-lg text-neutral-200 hover:text-amber-400 transition"
+              >
+                🌌 Ambient Cinema (Slow Dissolves & Light Leaks)
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Add Media Buttons */}
+          {onOpenAddMedia && (
+            <div className="flex items-center gap-1 bg-neutral-950 border border-neutral-800 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => onOpenAddMedia('image')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded text-neutral-300 hover:text-white hover:bg-neutral-900 text-xs transition"
+                title="Add custom image or generate AI image"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                <span>+ Image</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenAddMedia('video')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded text-neutral-300 hover:text-white hover:bg-neutral-900 text-xs transition"
+                title="Add custom video clip or video loop"
+              >
+                <VideoIcon className="w-3.5 h-3.5 text-amber-400" />
+                <span>+ Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenAddMedia('sound')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded text-neutral-300 hover:text-white hover:bg-neutral-900 text-xs transition"
+                title="Add soundtrack, record voiceover, or sound effects"
+              >
+                <Music className="w-3.5 h-3.5 text-amber-400" />
+                <span>+ Sound</span>
+              </button>
+            </div>
+          )}
+
           <button
             onClick={handleAddNewClip}
             className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition"
           >
             <Plus className="w-3.5 h-3.5 text-amber-400" />
-            <span>Add Shot Clip</span>
+            <span>Add Shot</span>
           </button>
 
           <button
@@ -249,6 +352,13 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
                     <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-md text-[10px] font-mono text-amber-400 border border-neutral-700">
                       #{index + 1}
                     </div>
+
+                    {/* Media Type Badge if video */}
+                    {(clip.mediaType === 'video' || clip.videoUrl) && (
+                      <div className="absolute top-2 left-10 px-1.5 py-0.5 rounded bg-blue-600/90 backdrop-blur-md text-[9px] font-mono font-bold text-white border border-blue-400">
+                        VIDEO
+                      </div>
+                    )}
 
                     {/* Duration pill */}
                     <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-md text-[10px] font-mono text-white border border-neutral-700">
@@ -390,46 +500,94 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
       {/* TRACK 2 & 3: Audio Soundtrack & Voiceover Tracks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-neutral-800/80">
         {/* Soundtrack Selector */}
-        <div className="bg-neutral-950/60 border border-neutral-800/80 rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="flex items-center gap-1.5 text-xs font-mono text-neutral-300">
-              <Music className="w-3.5 h-3.5 text-amber-400" />
-              <span>CINEMATIC SOUNDTRACK</span>
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono">
-              Web Audio Synth
-            </span>
+        <div className="bg-neutral-950/60 border border-neutral-800/80 rounded-xl p-3 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="flex items-center gap-1.5 text-xs font-mono text-neutral-300">
+                <Music className="w-3.5 h-3.5 text-amber-400" />
+                <span>CINEMATIC SOUNDTRACK</span>
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono">
+                Web Audio Synth
+              </span>
+            </div>
+
+            <select
+              value={soundtrack}
+              onChange={(e) => onSoundtrackChange(e.target.value)}
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-500/50 mb-2.5"
+            >
+              {SOUNDTRACK_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label} — {opt.mood}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <select
-            value={soundtrack}
-            onChange={(e) => onSoundtrackChange(e.target.value)}
-            className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-500/50"
-          >
-            {SOUNDTRACK_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label} — {opt.mood}
-              </option>
-            ))}
-          </select>
+          {onOpenAddMedia && (
+            <div className="flex items-center gap-2 pt-1 border-t border-neutral-900 text-xs">
+              <button
+                type="button"
+                onClick={() => onOpenAddMedia('sound')}
+                className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 font-medium"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Upload Custom Music</span>
+              </button>
+              <span className="text-neutral-700">•</span>
+              <button
+                type="button"
+                onClick={() => onOpenAddMedia('sound')}
+                className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white"
+              >
+                <Volume2 className="w-3 h-3" />
+                <span>Sound FX Library</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Voiceover Dubbing Status */}
-        <div className="bg-neutral-950/60 border border-neutral-800/80 rounded-xl p-3 flex items-center justify-between">
-          <div>
-            <span className="flex items-center gap-1.5 text-xs font-mono text-neutral-300 mb-1">
-              <Mic className="w-3.5 h-3.5 text-amber-400" />
-              <span>NARRATION & DIALOGUE DUBBING</span>
-            </span>
-            <p className="text-[11px] text-neutral-400">
-              {clips.filter((c) => c.voiceoverText).length} of {clips.length} scenes voiced
-            </p>
+        <div className="bg-neutral-950/60 border border-neutral-800/80 rounded-xl p-3 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <span className="flex items-center gap-1.5 text-xs font-mono text-neutral-300 mb-1">
+                <Mic className="w-3.5 h-3.5 text-amber-400" />
+                <span>NARRATION & DIALOGUE DUBBING</span>
+              </span>
+              <p className="text-[11px] text-neutral-400">
+                {clips.filter((c) => c.voiceoverText).length} of {clips.length} scenes voiced
+              </p>
+            </div>
+
+            <div className="text-right">
+              <span className="text-[10px] font-mono text-neutral-500 block">Gemini 3.8 Flash TTS</span>
+              <span className="text-xs font-bold text-amber-400">Fenrir Cinematic Voice</span>
+            </div>
           </div>
 
-          <div className="text-right">
-            <span className="text-[10px] font-mono text-neutral-500 block">Gemini 3.8 Flash TTS</span>
-            <span className="text-xs font-bold text-amber-400">Fenrir Cinematic Voice</span>
-          </div>
+          {onOpenAddMedia && (
+            <div className="flex items-center gap-2 pt-1 border-t border-neutral-900 text-xs">
+              <button
+                type="button"
+                onClick={() => onOpenAddMedia('sound')}
+                className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 font-medium"
+              >
+                <Mic className="w-3 h-3" />
+                <span>Record Mic Voiceover</span>
+              </button>
+              <span className="text-neutral-700">•</span>
+              <button
+                type="button"
+                onClick={() => onOpenAddMedia('sound')}
+                className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>Generate TTS Narration</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

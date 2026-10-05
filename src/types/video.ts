@@ -21,7 +21,9 @@ export type CameraMovement =
   | 'orbit-cw'
   | 'tracking-forward'
   | 'drone-crane'
-  | 'static-tripod';
+  | 'static-tripod'
+  | 'vertigo-zoom'
+  | 'handheld-sway';
 
 export type TransitionType = 
   | 'crossfade'
@@ -30,6 +32,12 @@ export type TransitionType =
   | 'wipe-left'
   | 'zoom-glitch'
   | 'film-burn'
+  | 'iris-wipe'
+  | 'zoom-blur'
+  | 'light-leak'
+  | 'whip-pan'
+  | 'spin-vortex'
+  | 'slice-wipe'
   | 'cut';
 
 export interface VideoClip {
@@ -38,6 +46,8 @@ export interface VideoClip {
   shotType: string;
   prompt: string;
   imageUrl: string;
+  videoUrl?: string; // Optional direct video file URL or uploaded video blob
+  mediaType?: 'image' | 'video';
   duration: number; // in seconds, default 6-12s
   cameraMovement: CameraMovement;
   transition: TransitionType;
@@ -58,7 +68,9 @@ export interface VideoClip {
 }
 
 export interface AudioTrackConfig {
-  soundtrack: string; // 'epic-orchestral' | 'cyberpunk-synth' | 'ambient-space' | 'cinema-piano' | 'tension-pulse' | 'none'
+  soundtrack: string; // 'epic-orchestral' | 'cyberpunk-synth' | 'ambient-space' | 'cinema-piano' | 'tension-pulse' | 'custom' | 'none'
+  customAudioUrl?: string;
+  customAudioName?: string;
   musicVolume: number; // 0 - 1
   voiceVolume: number; // 0 - 1
   sfxVolume: number; // 0 - 1

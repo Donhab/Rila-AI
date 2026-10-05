@@ -6,10 +6,11 @@ import { TimelineEditor } from './components/TimelineEditor';
 import { ClipInspector } from './components/ClipInspector';
 import { ExportModal } from './components/ExportModal';
 import { TemplatesModal } from './components/TemplatesModal';
+import { AddMediaModal } from './components/AddMediaModal';
 import { AspectRatio, CinematicStyle, VideoClip } from './types/video';
 import { SAMPLE_PROJECTS, PrebuiltProject } from './data/cinematicPresets';
 import { cinematicRenderer } from './utils/cinematicRenderer';
-import { Sparkles, SlidersHorizontal, Layers, CheckCircle2 } from 'lucide-react';
+import { Sparkles, SlidersHorizontal, Layers, CheckCircle2, Film } from 'lucide-react';
 
 export default function App() {
   // Initial default project: 62s Cyberpunk Neon Odyssey with 6 sequential scenes
@@ -30,8 +31,62 @@ export default function App() {
   const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState<boolean>(false);
+  const [isAddMediaOpen, setIsAddMediaOpen] = useState<boolean>(false);
+  const [addMediaInitialTab, setAddMediaInitialTab] = useState<'image' | 'video' | 'sound'>('image');
 
   const totalDuration = cinematicRenderer.getTotalDuration(clips);
+
+  // Open Add Media Modal with specific tab
+  const handleOpenAddMedia = (tab: 'image' | 'video' | 'sound' = 'image') => {
+    setAddMediaInitialTab(tab);
+    setIsAddMediaOpen(true);
+  };
+
+  // Replace active scene visual media
+  const handleReplaceSelectedVisual = (url: string, isVideo = false) => {
+    if (!selectedClipId) return;
+    setClips((prev) =>
+      prev.map((c) =>
+        c.id === selectedClipId
+          ? {
+              ...c,
+              imageUrl: url,
+              videoUrl: isVideo ? url : undefined,
+              mediaType: isVideo ? 'video' : 'image',
+            }
+          : c
+      )
+    );
+  };
+
+  // Set custom user soundtrack
+  const handleSetCustomSoundtrack = (url: string, name: string) => {
+    setSoundtrack('custom');
+  };
+
+  // Attach voiceover to active scene
+  const handleAttachVoiceoverToSelected = (audioUrl: string, text?: string) => {
+    if (!selectedClipId) return;
+    setClips((prev) =>
+      prev.map((c) =>
+        c.id === selectedClipId
+          ? {
+              ...c,
+              voiceoverAudioUrl: audioUrl,
+              voiceoverText: text || c.voiceoverText,
+            }
+          : c
+      )
+    );
+  };
+
+  // Attach sound effect cue to active scene
+  const handleAttachSoundEffectToSelected = (sfxLabel: string) => {
+    if (!selectedClipId) return;
+    setClips((prev) =>
+      prev.map((c) => (c.id === selectedClipId ? { ...c, soundEffect: sfxLabel } : c))
+    );
+  };
 
   // Load a generated 60s+ episodic film from PromptGenerator
   const handleAddGeneratedFilm = (title: string, newClips: VideoClip[], style: CinematicStyle) => {
@@ -88,6 +143,7 @@ export default function App() {
         onAspectRatioChange={setAspectRatio}
         onOpenTemplates={() => setIsTemplatesModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
+        onOpenAddMedia={() => handleOpenAddMedia('image')}
       />
 
       {/* Main Studio Workspace */}
@@ -154,6 +210,7 @@ export default function App() {
           soundtrack={soundtrack}
           onSoundtrackChange={setSoundtrack}
           onOpenExport={() => setIsExportModalOpen(true)}
+          onOpenAddMedia={handleOpenAddMedia}
         />
       </main>
 
@@ -184,6 +241,20 @@ export default function App() {
         onClose={() => setIsTemplatesModalOpen(false)}
         onSelectProject={handleSelectProject}
       />
+
+      {/* Add Media (Images, Videos, Sounds) Modal */}
+      <AddMediaModal
+        isOpen={isAddMediaOpen}
+        onClose={() => setIsAddMediaOpen(false)}
+        onAddClip={handleAddSingleClip}
+        onReplaceSelectedVisual={handleReplaceSelectedVisual}
+        onSetCustomSoundtrack={handleSetCustomSoundtrack}
+        onAttachVoiceoverToSelected={handleAttachVoiceoverToSelected}
+        onAttachSoundEffectToSelected={handleAttachSoundEffectToSelected}
+        selectedClip={selectedClip}
+        selectedStyle={selectedStyle}
+      />
     </div>
   );
 }
+

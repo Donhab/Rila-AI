@@ -187,8 +187,29 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
             }
           }
 
-          const transitions: VideoClip['transition'][] = ['crossfade', 'film-burn', 'wipe-left', 'zoom-glitch', 'dip-to-black'];
+          const transitions: VideoClip['transition'][] = [
+            'film-burn',
+            'light-leak',
+            'whip-pan',
+            'zoom-blur',
+            'spin-vortex',
+            'zoom-glitch',
+            'iris-wipe',
+            'crossfade',
+          ];
           const transitionType = i === scenes.length - 1 ? 'dip-to-black' : transitions[i % transitions.length];
+
+          const cameraVariety: CameraMovement[] = [
+            'dolly-in',
+            'orbit-cw',
+            'tracking-forward',
+            'vertigo-zoom',
+            'drone-crane',
+            'handheld-sway',
+            'pan-right',
+            'dolly-out',
+          ];
+          const camMovement = (sc.cameraMovement as CameraMovement) || cameraVariety[i % cameraVariety.length];
 
           newClips.push({
             id: `clip-${Date.now()}-${i}`,
@@ -197,12 +218,12 @@ export const PromptGenerator: React.FC<PromptGeneratorProps> = ({
             prompt: sc.prompt || prompt,
             imageUrl,
             duration: sc.duration || 10,
-            cameraMovement: (sc.cameraMovement as CameraMovement) || 'dolly-in',
+            cameraMovement: camMovement,
             transition: transitionType,
             transitionDuration: 0.9,
             voiceoverText: sc.voiceoverText || '',
             voiceoverAudioUrl: voiceAudioUrl,
-            soundEffect: sc.soundEffect || '',
+            soundEffect: sc.soundEffect || 'impact-boom',
             subtitleText: sc.subtitleText || sc.title?.split(':')[1]?.trim() || sc.title,
             filter: {
               brightness: 1,

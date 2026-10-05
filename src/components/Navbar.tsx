@@ -1,5 +1,5 @@
 import React from 'react';
-import { Film, Download, Sparkles, FolderOpen, Sliders, Layers } from 'lucide-react';
+import { Film, Download, Sparkles, FolderOpen, Sliders, Layers, Plus } from 'lucide-react';
 import { AspectRatio } from '../types/video';
 
 interface NavbarProps {
@@ -11,6 +11,7 @@ interface NavbarProps {
   onAspectRatioChange: (aspectRatio: AspectRatio) => void;
   onOpenTemplates: () => void;
   onOpenExport: () => void;
+  onOpenAddMedia?: () => void;
   onTogglePromptDrawer?: () => void;
 }
 
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onAspectRatioChange,
   onOpenTemplates,
   onOpenExport,
+  onOpenAddMedia,
 }) => {
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -104,6 +106,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           ))}
         </div>
+
+        {/* Add Media Button */}
+        {onOpenAddMedia && (
+          <button
+            onClick={onOpenAddMedia}
+            className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition"
+            title="Add images, videos, sounds, or voiceovers"
+          >
+            <Plus className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Add Media</span>
+          </button>
+        )}
 
         {/* Templates Button */}
         <button

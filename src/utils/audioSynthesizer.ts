@@ -15,6 +15,8 @@ class AudioSynthesizer {
   private currentTrack = 'epic-orchestral';
   private streamDestination: MediaStreamAudioDestinationNode | null = null;
   private currentVoiceAudio: HTMLAudioElement | null = null;
+  private customMusicAudio: HTMLAudioElement | null = null;
+  private customMusicSource: MediaElementAudioSourceNode | null = null;
 
   public init() {
     if (!this.ctx) {
@@ -56,7 +58,7 @@ class AudioSynthesizer {
     this.sfxGain.gain.setTargetAtTime(Math.max(0, Math.min(1, sfx)), now, 0.05);
   }
 
-  public startSoundtrack(trackId: string) {
+  public startSoundtrack(trackId: string, customUrl?: string) {
     this.init();
     this.stopSoundtrack();
     if (!this.ctx || !this.musicGain || trackId === 'none') return;
@@ -64,7 +66,9 @@ class AudioSynthesizer {
     this.isPlaying = true;
     this.currentTrack = trackId;
 
-    if (trackId === 'epic-orchestral') {
+    if (trackId === 'custom' && customUrl) {
+      this.playCustomSoundtrack(customUrl);
+    } else if (trackId === 'epic-orchestral') {
       this.playEpicOrchestral();
     } else if (trackId === 'cyberpunk-synth') {
       this.playCyberpunkSynth();
@@ -77,8 +81,35 @@ class AudioSynthesizer {
     }
   }
 
+  public playCustomSoundtrack(url: string) {
+    this.init();
+    if (!url || !this.ctx || !this.musicGain) return;
+
+    if (this.customMusicAudio) {
+      this.customMusicAudio.pause();
+      this.customMusicAudio = null;
+    }
+
+    try {
+      const audio = new Audio(url);
+      audio.crossOrigin = 'anonymous';
+      audio.loop = true;
+      if (!this.customMusicSource) {
+        this.customMusicSource = this.ctx.createMediaElementSource(audio);
+        this.customMusicSource.connect(this.musicGain);
+      }
+      this.customMusicAudio = audio;
+      audio.play().catch(() => {});
+    } catch {
+      // fallback
+    }
+  }
+
   public stopSoundtrack() {
     this.isPlaying = false;
+    if (this.customMusicAudio) {
+      this.customMusicAudio.pause();
+    }
     this.activeNodes.forEach(item => {
       if (typeof item === 'number') {
         window.clearInterval(item);
@@ -102,9 +133,9 @@ class AudioSynthesizer {
     const ctx = this.ctx;
     const now = ctx.currentTime;
 
-    if (type === 'crossfade' || type === 'wipe-left') {
-      // Cinematic Whoosh
-      const bufferSize = ctx.sampleRate * 0.8;
+    if (type === 'crossfade' || type === 'wipe-left' || type === 'whip-pan') {
+      // Cinematic Fast Whoosh
+      const bufferSize = ctx.sampleRate * 0.7;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
@@ -114,21 +145,21 @@ class AudioSynthesizer {
       noise.buffer = buffer;
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(200, now);
-      filter.frequency.exponentialRampToValueAtTime(3200, now + 0.4);
-      filter.frequency.exponentialRampToValueAtTime(150, now + 0.8);
-      filter.Q.setValueAtTime(3, now);
+      filter.frequency.setValueAtTime(type === 'whip-pan' ? 400 : 200, now);
+      filter.frequency.exponentialRampToValueAtTime(3600, now + 0.35);
+      filter.frequency.exponentialRampToValueAtTime(120, now + 0.7);
+      filter.Q.setValueAtTime(type === 'whip-pan' ? 4 : 2.5, now);
 
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.01, now);
-      gain.gain.linearRampToValueAtTime(0.45, now + 0.35);
-      gain.gain.linearRampToValueAtTime(0.001, now + 0.8);
+      gain.gain.linearRampToValueAtTime(0.5, now + 0.3);
+      gain.gain.linearRampToValueAtTime(0.001, now + 0.7);
 
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(this.sfxGain);
       noise.start(now);
-      noise.stop(now + 0.85);
+      noise.stop(now + 0.75);
     } else if (type === 'dip-to-black' || type === 'dip-to-white') {
       // Deep Sub-Bass Drop
       const osc = ctx.createOscillator();
@@ -160,21 +191,121 @@ class AudioSynthesizer {
       gain.connect(this.sfxGain);
       osc.start(now);
       osc.stop(now + 0.22);
-    } else if (type === 'film-burn') {
-      // Warm optical shutter snap
+    } else if (type === 'film-burn' || type === 'light-leak') {
+      // Warm optical shutter snap & prism swell
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(450, now);
-      osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+      osc.type = type === 'light-leak' ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(type === 'light-leak' ? 650 : 450, now);
+      osc.frequency.exponentialRampToValueAtTime(type === 'light-leak' ? 220 : 60, now + 0.5);
 
       gain.gain.setValueAtTime(0.4, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
 
       osc.connect(gain);
       gain.connect(this.sfxGain);
       osc.start(now);
-      osc.stop(now + 0.36);
+      osc.stop(now + 0.56);
+    } else if (type === 'zoom-blur' || type === 'spin-vortex' || type === 'iris-wipe' || type === 'slice-wipe') {
+      // Cinematic riser swoosh
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.4);
+
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.linearRampToValueAtTime(0.35, now + 0.3);
+      gain.gain.linearRampToValueAtTime(0.001, now + 0.6);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now);
+      osc.stop(now + 0.65);
+    }
+  }
+
+  public playSoundEffect(sfxId: string) {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    switch (sfxId) {
+      case 'impact-boom': {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(130, now);
+        osc.frequency.exponentialRampToValueAtTime(26, now + 2.0);
+        gain.gain.setValueAtTime(0.85, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(now);
+        osc.stop(now + 2.3);
+        break;
+      }
+      case 'whoosh-fast': {
+        this.playTransitionSFX('whip-pan');
+        break;
+      }
+      case 'film-burn-sfx': {
+        this.playTransitionSFX('film-burn');
+        break;
+      }
+      case 'light-leak-sfx': {
+        this.playTransitionSFX('light-leak');
+        break;
+      }
+      case 'cyber-glitch-sfx': {
+        this.playTransitionSFX('zoom-glitch');
+        break;
+      }
+      case 'sub-drop': {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(90, now);
+        osc.frequency.exponentialRampToValueAtTime(24, now + 1.8);
+        gain.gain.setValueAtTime(0.75, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(now);
+        osc.stop(now + 2.1);
+        break;
+      }
+      case 'riser-tension': {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.exponentialRampToValueAtTime(520, now + 3.0);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.linearRampToValueAtTime(0.4, now + 2.8);
+        gain.gain.linearRampToValueAtTime(0.001, now + 3.2);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(now);
+        osc.stop(now + 3.3);
+        break;
+      }
+      case 'space-drone':
+      default: {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(65.41, now); // C2
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0.4, now + 1.0);
+        gain.gain.linearRampToValueAtTime(0.001, now + 4.5);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(now);
+        osc.stop(now + 4.6);
+        break;
+      }
     }
   }
 

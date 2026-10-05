@@ -32,6 +32,7 @@ export function getResolutionDimensions(
 
 export class CinematicRenderer {
   private imageCache = new Map<string, HTMLImageElement>();
+  private videoCache = new Map<string, HTMLVideoElement>();
   private grainPatternCanvas: HTMLCanvasElement | null = null;
   private dustParticles: { x: number; y: number; size: number; speedX: number; speedY: number; opacity: number }[] = [];
 
@@ -53,9 +54,32 @@ export class CinematicRenderer {
     }
   }
 
+  public getVideoElement(url: string): HTMLVideoElement | null {
+    if (!url) return null;
+    if (this.videoCache.has(url)) {
+      return this.videoCache.get(url)!;
+    }
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.src = url;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.loop = true;
+    video.load();
+    this.videoCache.set(url, video);
+    return video;
+  }
+
   public preloadClipImages(clips: VideoClip[]): Promise<void[]> {
     return Promise.all(
       clips.map((clip) => {
+        if (clip.mediaType === 'video' || clip.videoUrl) {
+          const vUrl = clip.videoUrl || clip.imageUrl;
+          if (vUrl && !this.videoCache.has(vUrl)) {
+            this.getVideoElement(vUrl);
+          }
+        }
         if (!clip.imageUrl) return Promise.resolve();
         if (this.imageCache.has(clip.imageUrl)) return Promise.resolve();
 
@@ -174,7 +198,7 @@ export class CinematicRenderer {
       return;
     }
 
-    const { currentClip, clipProgress, nextClip, transitionProgress } = clipInfo;
+    const { currentClip, clipProgress, clipLocalTime, nextClip, transitionProgress } = clipInfo;
 
     // Base background
     ctx.fillStyle = '#020202';
@@ -190,11 +214,12 @@ export class CinematicRenderer {
         transitionProgress,
         width,
         height,
-        currentClip.transition
+        currentClip.transition,
+        clipLocalTime
       );
     } else {
       // Single clip render
-      this.renderSingleClip(ctx, currentClip, clipProgress, width, height, 1.0);
+      this.renderSingleClip(ctx, currentClip, clipProgress, width, height, 1.0, clipLocalTime);
     }
 
     // Atmospheric effects (particles, anamorphic blue flare, film grain, vignette)
@@ -215,9 +240,9 @@ export class CinematicRenderer {
     progress: number,
     width: number,
     height: number,
-    alpha = 1.0
+    alpha = 1.0,
+    localTime = 0
   ) {
-    const img = this.imageCache.get(clip.imageUrl);
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
@@ -227,14 +252,34 @@ export class CinematicRenderer {
     // Color Grading & Filters
     this.applyColorGradingFilter(ctx, clip);
 
-    if (img && img.complete && img.naturalWidth > 0) {
-      // Cover fit with generous padding for camera pans/zooms
-      const margin = 0.15;
-      const drawW = width * (1 + margin * 2);
-      const drawH = height * (1 + margin * 2);
-      const drawX = -width * margin;
-      const drawY = -height * margin;
+    const margin = 0.15;
+    const drawW = width * (1 + margin * 2);
+    const drawH = height * (1 + margin * 2);
+    const drawX = -width * margin;
+    const drawY = -height * margin;
 
+    // If mediaType is video or videoUrl is present, render video frame
+    if (clip.mediaType === 'video' || clip.videoUrl) {
+      const vUrl = clip.videoUrl || clip.imageUrl;
+      const video = this.getVideoElement(vUrl);
+      if (video && video.readyState >= 2) {
+        const targetTime = localTime % (video.duration || 10);
+        if (Math.abs(video.currentTime - targetTime) > 0.35) {
+          try {
+            video.currentTime = targetTime;
+          } catch {
+            // ignore seek errors
+          }
+        }
+        this.drawImageCover(ctx, video, drawX, drawY, drawW, drawH);
+        ctx.restore();
+        return;
+      }
+    }
+
+    // Otherwise render image
+    const img = this.imageCache.get(clip.imageUrl);
+    if (img && img.complete && img.naturalWidth > 0) {
       this.drawImageCover(ctx, img, drawX, drawY, drawW, drawH);
     } else {
       // Procedural cinematic visual placeholder
@@ -252,57 +297,188 @@ export class CinematicRenderer {
     tProgress: number, // 0 -> 1
     width: number,
     height: number,
-    type: TransitionType
+    type: TransitionType,
+    localTime = 0
   ) {
     const easeT = this.easeInOutQuad(tProgress);
 
     switch (type) {
       case 'crossfade': {
-        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0);
-        this.renderSingleClip(ctx, nextClip, 0.05, width, height, easeT);
+        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, easeT, 0.05);
         break;
       }
       case 'dip-to-black': {
         if (easeT < 0.5) {
           const fadeOut = 1 - easeT * 2;
-          this.renderSingleClip(ctx, currClip, clipProgress, width, height, fadeOut);
+          this.renderSingleClip(ctx, currClip, clipProgress, width, height, fadeOut, localTime);
         } else {
           const fadeIn = (easeT - 0.5) * 2;
-          this.renderSingleClip(ctx, nextClip, 0.05, width, height, fadeIn);
+          this.renderSingleClip(ctx, nextClip, 0.05, width, height, fadeIn, 0.05);
         }
         break;
       }
       case 'dip-to-white': {
         if (easeT < 0.5) {
-          this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0);
+          this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
           ctx.fillStyle = `rgba(255, 255, 255, ${easeT * 2})`;
           ctx.fillRect(0, 0, width, height);
         } else {
-          this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0);
+          this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
           ctx.fillStyle = `rgba(255, 255, 255, ${(1 - easeT) * 2})`;
           ctx.fillRect(0, 0, width, height);
         }
         break;
       }
       case 'film-burn': {
-        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1 - easeT);
-        this.renderSingleClip(ctx, nextClip, 0.05, width, height, easeT);
+        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1 - easeT, localTime);
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, easeT, 0.05);
 
-        // Warm optical flare burst in the middle
-        const burstAlpha = Math.sin(tProgress * Math.PI) * 0.85;
+        // Warm 35mm optical flare burst and film frame jitter
+        const burstAlpha = Math.sin(tProgress * Math.PI) * 0.9;
         const burnGrad = ctx.createRadialGradient(
+          width * (0.45 + Math.sin(tProgress * 10) * 0.1),
+          height * 0.5,
+          15,
           width * 0.5,
           height * 0.5,
-          10,
-          width * 0.5,
-          height * 0.5,
-          width * 0.8
+          width * 0.85
         );
-        burnGrad.addColorStop(0, `rgba(255, 220, 140, ${burstAlpha})`);
-        burnGrad.addColorStop(0.4, `rgba(255, 120, 20, ${burstAlpha * 0.7})`);
+        burnGrad.addColorStop(0, `rgba(255, 235, 170, ${burstAlpha})`);
+        burnGrad.addColorStop(0.35, `rgba(255, 130, 30, ${burstAlpha * 0.75})`);
+        burnGrad.addColorStop(0.7, `rgba(220, 40, 10, ${burstAlpha * 0.4})`);
         burnGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = burnGrad;
         ctx.fillRect(0, 0, width, height);
+        break;
+      }
+      case 'light-leak': {
+        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, easeT, 0.05);
+
+        // Anamorphic horizontal prism light leak wipe
+        const leakX = (easeT * 1.4 - 0.2) * width;
+        const leakW = width * 0.65;
+        const leakGrad = ctx.createLinearGradient(leakX - leakW / 2, 0, leakX + leakW / 2, 0);
+        const lAlpha = Math.sin(tProgress * Math.PI) * 0.85;
+        leakGrad.addColorStop(0, 'rgba(255, 215, 0, 0)');
+        leakGrad.addColorStop(0.3, `rgba(255, 180, 50, ${lAlpha * 0.5})`);
+        leakGrad.addColorStop(0.5, `rgba(255, 255, 255, ${lAlpha})`);
+        leakGrad.addColorStop(0.7, `rgba(64, 200, 255, ${lAlpha * 0.6})`);
+        leakGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
+        ctx.fillStyle = leakGrad;
+        ctx.fillRect(0, 0, width, height);
+        break;
+      }
+      case 'whip-pan': {
+        const offset = easeT * width;
+        // Directional motion blur streaks
+        ctx.save();
+        ctx.translate(-offset, 0);
+        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
+        ctx.translate(width, 0);
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
+        ctx.restore();
+
+        // Speed lines streak overlay during midpoint
+        const blurAlpha = Math.sin(tProgress * Math.PI) * 0.5;
+        if (blurAlpha > 0.05) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${blurAlpha * 0.25})`;
+          for (let i = 0; i < 6; i++) {
+            const lineY = (height / 7) * (i + 1);
+            ctx.fillRect(0, lineY - 2, width, 4);
+          }
+        }
+        break;
+      }
+      case 'zoom-blur': {
+        const zScale = 1.0 + Math.sin(tProgress * Math.PI) * 0.45;
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        ctx.scale(zScale, zScale);
+        ctx.translate(-width / 2, -height / 2);
+
+        if (easeT < 0.5) {
+          this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
+        } else {
+          this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
+        }
+        ctx.restore();
+
+        // Center flash bloom
+        const flashAlpha = Math.sin(tProgress * Math.PI) * 0.4;
+        const radGrad = ctx.createRadialGradient(width / 2, height / 2, 10, width / 2, height / 2, width * 0.6);
+        radGrad.addColorStop(0, `rgba(255, 255, 255, ${flashAlpha})`);
+        radGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = radGrad;
+        ctx.fillRect(0, 0, width, height);
+        break;
+      }
+      case 'spin-vortex': {
+        const rot = easeT * Math.PI * 0.4;
+        const scale = 1.0 + Math.sin(tProgress * Math.PI) * 0.3;
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        ctx.rotate(rot);
+        ctx.scale(scale, scale);
+        ctx.translate(-width / 2, -height / 2);
+
+        if (easeT < 0.5) {
+          this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1 - easeT * 2, localTime);
+        } else {
+          this.renderSingleClip(ctx, nextClip, 0.05, width, height, (easeT - 0.5) * 2, 0.05);
+        }
+        ctx.restore();
+        break;
+      }
+      case 'iris-wipe': {
+        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
+
+        // Circular iris expansion
+        const maxR = Math.hypot(width / 2, height / 2);
+        const radius = easeT * maxR;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(width / 2, height / 2, radius, 0, Math.PI * 2);
+        ctx.clip();
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
+        ctx.restore();
+
+        // Iris luminous ring border
+        ctx.save();
+        ctx.strokeStyle = `rgba(245, 158, 11, ${Math.sin(tProgress * Math.PI) * 0.8})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(width / 2, height / 2, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case 'slice-wipe': {
+        // Diagonal shutter slice
+        const offset = easeT * (width + height);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(offset, 0);
+        ctx.lineTo(offset - height, height);
+        ctx.lineTo(0, height);
+        ctx.closePath();
+        ctx.clip();
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(offset, 0);
+        ctx.lineTo(width, 0);
+        ctx.lineTo(width, height);
+        ctx.lineTo(offset - height, height);
+        ctx.closePath();
+        ctx.clip();
+        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
+        ctx.restore();
         break;
       }
       case 'wipe-left': {
@@ -311,14 +487,14 @@ export class CinematicRenderer {
         ctx.beginPath();
         ctx.rect(0, 0, width - offset, height);
         ctx.clip();
-        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0);
+        this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
         ctx.restore();
 
         ctx.save();
         ctx.beginPath();
         ctx.rect(width - offset, 0, offset, height);
         ctx.clip();
-        this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0);
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
         ctx.restore();
         break;
       }
@@ -330,9 +506,9 @@ export class CinematicRenderer {
         ctx.translate(-width / 2, -height / 2);
 
         if (easeT < 0.5) {
-          this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0);
+          this.renderSingleClip(ctx, currClip, clipProgress, width, height, 1.0, localTime);
         } else {
-          this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0);
+          this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
         }
 
         // RGB Split glitch artifact
@@ -342,7 +518,7 @@ export class CinematicRenderer {
         break;
       }
       default:
-        this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0);
+        this.renderSingleClip(ctx, nextClip, 0.05, width, height, 1.0, 0.05);
     }
   }
 
@@ -414,6 +590,25 @@ export class CinematicRenderer {
         const swayX = Math.sin(p * Math.PI * 4) * 5;
         const swayY = Math.cos(p * Math.PI * 4) * 3;
         ctx.scale(scale, scale);
+        ctx.translate(swayX, swayY);
+        break;
+      }
+      case 'vertigo-zoom': {
+        // Hitchcock contra-zoom: scale pushes dramatically while translating focal center
+        const scale = 1.0 + Math.pow(p, 1.2) * 0.28;
+        const shiftY = (p - 0.5) * (height * 0.04);
+        ctx.scale(scale, scale);
+        ctx.translate(0, shiftY);
+        break;
+      }
+      case 'handheld-sway': {
+        // Natural organic steadicam breathing
+        const scale = 1.08;
+        const swayX = Math.sin(p * Math.PI * 5) * 6 + Math.cos(p * Math.PI * 2.5) * 3;
+        const swayY = Math.cos(p * Math.PI * 4) * 4 + Math.sin(p * Math.PI * 1.5) * 2;
+        const rot = (Math.sin(p * Math.PI * 3) * 0.7 * Math.PI) / 180;
+        ctx.scale(scale, scale);
+        ctx.rotate(rot);
         ctx.translate(swayX, swayY);
         break;
       }
@@ -653,25 +848,27 @@ export class CinematicRenderer {
 
   private drawImageCover(
     ctx: CanvasRenderingContext2D,
-    img: HTMLImageElement,
+    img: HTMLImageElement | HTMLVideoElement,
     x: number,
     y: number,
     w: number,
     h: number
   ) {
-    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const nw = 'naturalWidth' in img ? img.naturalWidth : (img as HTMLVideoElement).videoWidth || w;
+    const nh = 'naturalHeight' in img ? img.naturalHeight : (img as HTMLVideoElement).videoHeight || h;
+    const imgRatio = (nw && nh) ? nw / nh : w / h;
     const canvasRatio = w / h;
-    let sWidth = img.naturalWidth;
-    let sHeight = img.naturalHeight;
+    let sWidth = nw || w;
+    let sHeight = nh || h;
     let sx = 0;
     let sy = 0;
 
     if (canvasRatio > imgRatio) {
-      sHeight = img.naturalWidth / canvasRatio;
-      sy = (img.naturalHeight - sHeight) / 2;
+      sHeight = (nw || w) / canvasRatio;
+      sy = ((nh || h) - sHeight) / 2;
     } else {
-      sWidth = img.naturalHeight * canvasRatio;
-      sx = (img.naturalWidth - sWidth) / 2;
+      sWidth = (nh || h) * canvasRatio;
+      sx = ((nw || w) - sWidth) / 2;
     }
 
     ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);

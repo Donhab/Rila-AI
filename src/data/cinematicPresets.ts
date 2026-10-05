@@ -114,16 +114,24 @@ export const CAMERA_MOVEMENTS: { id: CameraMovement; label: string; desc: string
   { id: 'orbit-cw', label: 'Orbital 360', desc: 'Dynamic circular motion around subject' },
   { id: 'drone-crane', label: 'Crane / Drone', desc: 'Sweeping aerial altitude rise' },
   { id: 'tracking-forward', label: 'Steadicam Track', desc: 'Cinematic forward momentum with subtle sway' },
+  { id: 'vertigo-zoom', label: 'Vertigo Dolly Zoom', desc: 'Hitchcock contra-zoom perspective warping' },
+  { id: 'handheld-sway', label: 'Handheld Cinematic', desc: 'Organic steadicam documentary breathing' },
   { id: 'static-tripod', label: 'Tripod Still', desc: 'Locked-off composed framing' },
 ];
 
 export const TRANSITION_OPTIONS: { id: TransitionType; label: string; desc: string }[] = [
   { id: 'crossfade', label: 'Cross Dissolve', desc: 'Smooth cinematic blend between scenes' },
+  { id: 'film-burn', label: 'Film Burn 35mm', desc: 'Warm optical flare burst & frame jitter' },
+  { id: 'light-leak', label: 'Anamorphic Light Leak', desc: 'Prismatic golden streak light bleed' },
+  { id: 'zoom-blur', label: 'High-Speed Zoom Blur', desc: 'Directional velocity burst push' },
+  { id: 'whip-pan', label: 'Whip Pan Swipe', desc: 'High velocity camera whip blur' },
+  { id: 'spin-vortex', label: 'Spin Vortex', desc: 'Dynamic 3D rotational spiral dissolve' },
+  { id: 'zoom-glitch', label: 'Glitch Zoom', desc: 'RGB chromatic split & pulse distortion' },
+  { id: 'iris-wipe', label: 'Circular Iris Wipe', desc: 'Vintage cinematic circular iris reveal' },
+  { id: 'slice-wipe', label: 'Diagonal Shutter Slice', desc: 'Futuristic geometric angle swipe' },
   { id: 'dip-to-black', label: 'Dip to Black', desc: 'Classic dramatic fade to black pause' },
   { id: 'dip-to-white', label: 'Flash to White', desc: 'High-energy burst of light transition' },
-  { id: 'film-burn', label: 'Film Burn', desc: 'Warm 35mm optical light leak transition' },
-  { id: 'wipe-left', label: 'Whip Pan Slide', desc: 'Fast directional camera whip cut' },
-  { id: 'zoom-glitch', label: 'Glitch Zoom', desc: 'Modern rapid pulse distortion' },
+  { id: 'wipe-left', label: 'Slide Push', desc: 'Horizontal frame displacement wipe' },
   { id: 'cut', label: 'Hard Cut', desc: 'Immediate direct cut for punchy pacing' },
 ];
 
@@ -133,8 +141,193 @@ export const SOUNDTRACK_OPTIONS = [
   { id: 'ambient-space', label: 'Deep Cosmic Drift', mood: 'Ethereal drone, celestial pads, distant solar wind' },
   { id: 'cinema-piano', label: 'Echoes of Memory', mood: 'Solo cinematic grand piano, gentle reverb, melancholic' },
   { id: 'tension-pulse', label: 'Dark Horizon Pulse', mood: 'Rhythmic sub bass pulse, ticking clock, rising suspense' },
+  { id: 'custom', label: 'Custom User Audio', mood: 'Your uploaded custom soundtrack or song' },
   { id: 'none', label: 'Audio Off (Mute)', mood: 'Pure video with no background track' },
 ];
+
+export interface StockMediaItem {
+  id: string;
+  title: string;
+  category: string;
+  url: string;
+  thumbnailUrl: string;
+  type: 'image' | 'video';
+  duration?: number;
+  tags: string[];
+}
+
+export const STOCK_IMAGES: StockMediaItem[] = [
+  {
+    id: 'stock-img-1',
+    title: 'Neo Tokyo Cyberpunk Alley',
+    category: 'Cyberpunk',
+    url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80',
+    type: 'image',
+    tags: ['cyberpunk', 'neon', 'rain', 'night', 'futuristic'],
+  },
+  {
+    id: 'stock-img-2',
+    title: 'Interstellar Cosmic Nebula',
+    category: 'Sci-Fi',
+    url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=400&q=80',
+    type: 'image',
+    tags: ['space', 'galaxy', 'stars', 'nebula', 'cosmos'],
+  },
+  {
+    id: 'stock-img-3',
+    title: 'Moody 35mm Hollywood Desert',
+    category: 'Cinematic',
+    url: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=1920&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=400&q=80',
+    type: 'image',
+    tags: ['desert', 'dune', 'golden hour', 'warm', 'cinematic'],
+  },
+  {
+    id: 'stock-img-4',
+    title: 'Futuristic Cyber Samurai',
+    category: 'Cyberpunk',
+    url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1920&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=400&q=80',
+    type: 'image',
+    tags: ['samurai', 'cyberpunk', 'blade', 'katana', 'character'],
+  },
+  {
+    id: 'stock-img-5',
+    title: 'Ghibli Style Whispering Mountain',
+    category: 'Anime',
+    url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80',
+    type: 'image',
+    tags: ['mountain', 'clouds', 'nature', 'anime', 'vivid'],
+  },
+  {
+    id: 'stock-img-6',
+    title: 'Dark Gothic Cathedral Chamber',
+    category: 'Fantasy',
+    url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1920&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+    type: 'image',
+    tags: ['gothic', 'cathedral', 'baroque', 'torchlight', 'dark'],
+  },
+];
+
+export const STOCK_VIDEOS: StockMediaItem[] = [
+  {
+    id: 'stock-vid-1',
+    title: 'Neon Matrix Digital Grid Loop',
+    category: 'Cyberpunk',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80',
+    type: 'video',
+    duration: 15,
+    tags: ['cyberpunk', 'neon', 'motion', 'video', 'grid'],
+  },
+  {
+    id: 'stock-vid-2',
+    title: 'Deep Space Cosmic Exploration',
+    category: 'Sci-Fi',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=400&q=80',
+    type: 'video',
+    duration: 15,
+    tags: ['space', 'video', 'cinematic', 'exploration'],
+  },
+  {
+    id: 'stock-vid-3',
+    title: 'Aerial Dramatic Coastline Swell',
+    category: 'Cinematic',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
+    type: 'video',
+    duration: 12,
+    tags: ['aerial', 'drone', 'ocean', 'cinematic', 'video'],
+  },
+];
+
+export interface SoundEffectItem {
+  id: string;
+  label: string;
+  category: 'Cinematic' | 'Sci-Fi' | 'Transition' | 'Ambient';
+  duration: number; // in seconds
+  description: string;
+}
+
+export const SOUND_EFFECTS: SoundEffectItem[] = [
+  { id: 'impact-boom', label: 'Cinematic Impact Boom', category: 'Cinematic', duration: 3.5, description: 'Sub-bass drop with explosive trailer slam' },
+  { id: 'whoosh-fast', label: 'High-Speed Whoosh Cut', category: 'Transition', duration: 1.2, description: 'Directional air displacement for whip pans' },
+  { id: 'film-burn-sfx', label: '35mm Film Projector Burn', category: 'Transition', duration: 2.0, description: 'Warm optical flare hiss with shutter click' },
+  { id: 'light-leak-sfx', label: 'Prism Shimmer Swell', category: 'Transition', duration: 2.5, description: 'Crystal harmonics and ethereal light resonance' },
+  { id: 'cyber-glitch-sfx', label: 'Cybernetic Glitch Pulse', category: 'Sci-Fi', duration: 1.5, description: 'Digital bitcrush and frequency modulation' },
+  { id: 'space-drone', label: 'Solar Wind Ambient Drone', category: 'Ambient', duration: 6.0, description: 'Deep ethereal sub-pad with celestial echoes' },
+  { id: 'riser-tension', label: 'Orchestral Climax Riser', category: 'Cinematic', duration: 4.0, description: 'Escalating string tension leading to impact' },
+  { id: 'sub-drop', label: 'Sub-Harmonic Wave Drop', category: 'Cinematic', duration: 3.0, description: 'Chest-rattling 30Hz bass sweep' },
+];
+
+/**
+ * Intelligently auto-assigns animated transitions and dynamic camera choreographies across scenes
+ */
+export function autoAssignAnimationsAndTransitions(
+  clips: VideoClip[],
+  mode: 'variety' | 'action' | 'ambient' = 'variety'
+): VideoClip[] {
+  const transitionsVariety: TransitionType[] = [
+    'film-burn',
+    'light-leak',
+    'whip-pan',
+    'zoom-blur',
+    'spin-vortex',
+    'zoom-glitch',
+    'iris-wipe',
+    'crossfade',
+  ];
+
+  const cameraVariety: CameraMovement[] = [
+    'dolly-in',
+    'orbit-cw',
+    'tracking-forward',
+    'vertigo-zoom',
+    'pan-right',
+    'drone-crane',
+    'handheld-sway',
+    'dolly-out',
+  ];
+
+  return clips.map((clip, idx) => {
+    let chosenTransition: TransitionType;
+    let chosenCamera: CameraMovement;
+
+    if (idx === clips.length - 1) {
+      chosenTransition = 'dip-to-black';
+    } else if (mode === 'action') {
+      const actionTrans: TransitionType[] = ['whip-pan', 'zoom-blur', 'zoom-glitch', 'film-burn'];
+      chosenTransition = actionTrans[idx % actionTrans.length];
+    } else if (mode === 'ambient') {
+      const ambientTrans: TransitionType[] = ['crossfade', 'light-leak', 'film-burn', 'iris-wipe'];
+      chosenTransition = ambientTrans[idx % ambientTrans.length];
+    } else {
+      chosenTransition = transitionsVariety[idx % transitionsVariety.length];
+    }
+
+    if (mode === 'action') {
+      const actionCam: CameraMovement[] = ['tracking-forward', 'vertigo-zoom', 'orbit-cw', 'handheld-sway'];
+      chosenCamera = actionCam[idx % actionCam.length];
+    } else if (mode === 'ambient') {
+      const ambientCam: CameraMovement[] = ['dolly-in', 'drone-crane', 'pan-right', 'dolly-out'];
+      chosenCamera = ambientCam[idx % ambientCam.length];
+    } else {
+      chosenCamera = cameraVariety[idx % cameraVariety.length];
+    }
+
+    return {
+      ...clip,
+      transition: chosenTransition,
+      transitionDuration: Math.max(0.7, Math.min(1.4, clip.transitionDuration || 0.9)),
+      cameraMovement: chosenCamera,
+    };
+  });
+}
 
 // Curated 60s+ Starter Projects
 export interface PrebuiltProject {

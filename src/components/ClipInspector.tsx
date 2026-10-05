@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   X,
   Camera,
@@ -12,9 +12,13 @@ import {
   Loader2,
   Eye,
   Check,
+  Upload,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  Play,
 } from 'lucide-react';
 import { CameraMovement, CinematicStyle, TransitionType, VideoClip } from '../types/video';
-import { CAMERA_MOVEMENTS, CINEMATIC_STYLES, TRANSITION_OPTIONS } from '../data/cinematicPresets';
+import { CAMERA_MOVEMENTS, CINEMATIC_STYLES, TRANSITION_OPTIONS, SOUND_EFFECTS } from '../data/cinematicPresets';
 import { audioSynthesizer } from '../utils/audioSynthesizer';
 
 interface ClipInspectorProps {
@@ -35,6 +39,15 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
   const [isRegeneratingImage, setIsRegeneratingImage] = useState(false);
   const [isSynthesizingVoice, setIsSynthesizingVoice] = useState(false);
   const [isPlayingAudioPreview, setIsPlayingAudioPreview] = useState(false);
+  const [isRecordingMic, setIsRecordingMic] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recTimerRef = useRef<number | null>(null);
+
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFieldChange = <K extends keyof VideoClip>(field: K, value: VideoClip[K]) => {
     onUpdateClip({ ...clip, [field]: value });
@@ -48,6 +61,75 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
         [filterKey]: val,
       },
     });
+  };
+
+  // Replace image from user file
+  const handleUploadLocalImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const url = ev.target?.result as string;
+      if (url) {
+        onUpdateClip({
+          ...clip,
+          imageUrl: url,
+          mediaType: 'image',
+          title: file.name.replace(/\.[^/.]+$/, ''),
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Replace video from user file
+  const handleUploadLocalVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    onUpdateClip({
+      ...clip,
+      videoUrl: url,
+      imageUrl: url,
+      mediaType: 'video',
+      title: file.name.replace(/\.[^/.]+$/, ''),
+    });
+  };
+
+  // In-drawer Mic voiceover recorder
+  const startRecordingMic = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mr.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        handleFieldChange('voiceoverAudioUrl', url);
+        if (!clip.voiceoverText) handleFieldChange('voiceoverText', 'Recorded voice narration');
+      };
+      mr.start();
+      setIsRecordingMic(true);
+      setRecSeconds(0);
+      recTimerRef.current = window.setInterval(() => {
+        setRecSeconds((s) => s + 1);
+      }, 1000);
+    } catch {
+      alert('Microphone access denied or unavailable.');
+    }
+  };
+
+  const stopRecordingMic = () => {
+    if (mediaRecorderRef.current && isRecordingMic) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+      setIsRecordingMic(false);
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+    }
   };
 
   // Regenerate visual frame with Gemini
@@ -66,6 +148,7 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
         const data = await res.json();
         if (data.imageUrl) {
           handleFieldChange('imageUrl', data.imageUrl);
+          handleFieldChange('mediaType', 'image');
         }
       }
     } catch (e) {
@@ -112,6 +195,8 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
     }
   };
 
+  const isVideo = clip.mediaType === 'video' || Boolean(clip.videoUrl);
+
   return (
     <div className="fixed inset-y-0 right-0 w-full sm:w-[460px] bg-neutral-950/95 border-l border-neutral-800 shadow-2xl z-50 flex flex-col backdrop-blur-xl animate-in slide-in-from-right duration-200">
       {/* Drawer Header */}
@@ -121,6 +206,11 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
           <h2 className="text-sm font-bold text-white font-['Space_Grotesk'] uppercase tracking-wider">
             Clip Inspector #{clipIndex + 1}
           </h2>
+          {isVideo && (
+            <span className="px-1.5 py-0.5 rounded bg-blue-600 text-[9px] font-mono font-bold text-white">
+              VIDEO
+            </span>
+          )}
         </div>
         <button
           onClick={onClose}
@@ -132,18 +222,62 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
 
       {/* Drawer Body Scroll */}
       <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-neutral-300 scrollbar-thin scrollbar-thumb-neutral-800">
-        {/* Frame Preview & Regenerate */}
+        {/* Frame / Video Preview & Replacement */}
         <div>
           <div className="relative rounded-xl overflow-hidden aspect-video bg-neutral-900 border border-neutral-800 mb-2">
-            <img
-              src={clip.imageUrl}
-              alt={clip.title}
-              className="w-full h-full object-cover"
-            />
+            {isVideo ? (
+              <video
+                src={clip.videoUrl || clip.imageUrl}
+                controls
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <img
+                src={clip.imageUrl}
+                alt={clip.title}
+                className="w-full h-full object-cover"
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
             <span className="absolute bottom-2 left-2 bg-black/75 px-2 py-0.5 rounded text-[10px] font-mono text-amber-400 border border-neutral-700">
               {clip.shotType}
             </span>
+          </div>
+
+          {/* Hidden inputs for uploading replacement media */}
+          <input
+            type="file"
+            ref={imageInputRef}
+            accept="image/*"
+            onChange={handleUploadLocalImage}
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={videoInputRef}
+            accept="video/*"
+            onChange={handleUploadLocalVideo}
+            className="hidden"
+          />
+
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              className="flex items-center justify-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white py-1.5 rounded-lg text-[11px] transition"
+            >
+              <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>Replace Image</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => videoInputRef.current?.click()}
+              className="flex items-center justify-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white py-1.5 rounded-lg text-[11px] transition"
+            >
+              <VideoIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>Replace Video</span>
+            </button>
           </div>
 
           <button
@@ -243,8 +377,9 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
 
         {/* Transition To Next Clip */}
         <div>
-          <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1">
-            Transition to Next Scene
+          <label className="block text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-1 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Animated Transition to Next Scene</span>
           </label>
           <select
             value={clip.transition}
@@ -259,7 +394,38 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
           </select>
         </div>
 
-        {/* Voiceover Narration & TTS */}
+        {/* Sound Design Effect */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[11px] font-mono uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+              <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Sound Design Cue / SFX</span>
+            </label>
+            {clip.soundEffect && (
+              <button
+                type="button"
+                onClick={() => audioSynthesizer.playSoundEffect('impact-boom')}
+                className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1"
+              >
+                <Play className="w-2.5 h-2.5 fill-current" />
+                <span>Test SFX</span>
+              </button>
+            )}
+          </div>
+          <select
+            value={clip.soundEffect || 'impact-boom'}
+            onChange={(e) => handleFieldChange('soundEffect', e.target.value)}
+            className="w-full bg-neutral-900 border border-neutral-800 focus:border-amber-500 rounded-lg px-3 py-2 text-neutral-100 text-xs mb-1"
+          >
+            {SOUND_EFFECTS.map((s) => (
+              <option key={s.id} value={s.label}>
+                {s.label} ({s.category})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Voiceover Narration & Mic Recorder */}
         <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between">
             <label className="text-[11px] font-mono uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
@@ -286,19 +452,40 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
             className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-neutral-100 resize-none focus:outline-none focus:border-amber-500"
           />
 
-          <button
-            type="button"
-            onClick={handleSynthesizeSpeech}
-            disabled={!clip.voiceoverText || isSynthesizingVoice}
-            className="w-full flex items-center justify-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-40"
-          >
-            {isSynthesizingVoice ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <div className="grid grid-cols-2 gap-2">
+            {!isRecordingMic ? (
+              <button
+                type="button"
+                onClick={startRecordingMic}
+                className="flex items-center justify-center gap-1.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 py-1.5 rounded-lg text-xs font-medium transition"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Record Mic</span>
+              </button>
             ) : (
-              <Sparkles className="w-3.5 h-3.5" />
+              <button
+                type="button"
+                onClick={stopRecordingMic}
+                className="flex items-center justify-center gap-1.5 bg-red-600 text-white animate-pulse py-1.5 rounded-lg text-xs font-bold transition"
+              >
+                <span>Stop Rec ({recSeconds}s)</span>
+              </button>
             )}
-            <span>{isSynthesizingVoice ? 'Synthesizing with Gemini TTS...' : 'Generate Voice Audio (Gemini TTS)'}</span>
-          </button>
+
+            <button
+              type="button"
+              onClick={handleSynthesizeSpeech}
+              disabled={!clip.voiceoverText || isSynthesizingVoice}
+              className="flex items-center justify-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-40"
+            >
+              {isSynthesizingVoice ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              <span>Gemini TTS</span>
+            </button>
+          </div>
         </div>
 
         {/* Subtitle / Lower-Third Caption */}
@@ -348,45 +535,28 @@ export const ClipInspector: React.FC<ClipInspectorProps> = ({
             <input
               type="range"
               min="0"
-              max="0.4"
+              max="0.5"
               step="0.02"
               value={clip.filter.filmGrain || 0}
               onChange={(e) => handleFilterChange('filmGrain', parseFloat(e.target.value))}
-              className="w-full accent-amber-500"
+              className="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer"
             />
           </div>
 
           {/* Vignette */}
           <div>
             <div className="flex justify-between text-[11px] text-neutral-400 mb-1">
-              <span>Lens Vignetting</span>
+              <span>Vignette Edge Falloff</span>
               <span className="font-mono text-amber-400">{Math.round((clip.filter.vignette || 0) * 100)}%</span>
             </div>
             <input
               type="range"
               min="0"
-              max="0.7"
+              max="0.8"
               step="0.05"
               value={clip.filter.vignette || 0}
               onChange={(e) => handleFilterChange('vignette', parseFloat(e.target.value))}
-              className="w-full accent-amber-500"
-            />
-          </div>
-
-          {/* Contrast */}
-          <div>
-            <div className="flex justify-between text-[11px] text-neutral-400 mb-1">
-              <span>Dynamic Contrast</span>
-              <span className="font-mono text-amber-400">{clip.filter.contrast.toFixed(2)}x</span>
-            </div>
-            <input
-              type="range"
-              min="0.8"
-              max="1.5"
-              step="0.05"
-              value={clip.filter.contrast}
-              onChange={(e) => handleFilterChange('contrast', parseFloat(e.target.value))}
-              className="w-full accent-amber-500"
+              className="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer"
             />
           </div>
         </div>
